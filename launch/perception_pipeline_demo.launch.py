@@ -99,13 +99,14 @@ def generate_launch_description():
         arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "panda_link0"],
     )
 
-    camera_node = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="static_transform_publisher",
-        output="log",
-        arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "camera_link"],
-    )
+    # camera_node = Node(
+    #     package="tf2_ros",
+    #     executable="static_transform_publisher",
+    #     name="static_transform_publisher",
+    #     output="log",
+    #     # arguments=["1.0", "0.0", "0.0", "1.57", "0.0", "0.0", "tag36h11:15", "world"],
+    #     arguments=["1.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "tag36h11:15"],
+    # )
 
     # Publish TF
     robot_state_publisher = Node(
@@ -160,7 +161,6 @@ def generate_launch_description():
             ros2_control_hardware_type,
             rviz_node,
             static_tf_node,
-            camera_node,
             robot_state_publisher,
             move_group_node,
             ros2_control_node,
