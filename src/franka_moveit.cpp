@@ -57,6 +57,7 @@ void publishTcpTrajectory(
     pub->publish(marker);
   }
 
+
 int main(int argc, char * argv[])
 {
   // Initialize ROS and create the Node
@@ -71,6 +72,7 @@ int main(int argc, char * argv[])
 
   // Publisher for path of another link
   auto marker_pub = node->create_publisher<visualization_msgs::msg::Marker>("tcp_trajectory", 10);
+  auto start_pub = node->create_publisher<geometry_msgs::msg::Pose>("start_pose", 10);
   
   // rclcpp::executors::SingleThreadedExecutor executor;
   // executor.add_node(node);
@@ -87,11 +89,19 @@ int main(int argc, char * argv[])
   move_group.startStateMonitor();
 
   moveit::planning_interface::MoveGroupInterface::Plan plan;
-  moveit::core::RobotStatePtr robotState = move_group.getCurrentState(5);
-  const moveit::core::JointModelGroup* joint_model = robotState->getJointModelGroup(plannerGroup);
-  moveit::core::RobotState save_state(*robotState);
+  moveit::core::RobotStatePtr robot_state = move_group.getCurrentState();
+  const moveit::core::JointModelGroup* joint_model = robot_state->getJointModelGroup(plannerGroup);
+
+  // moveit::core::RobotModelPtr robot_model = move_group.getRobotModel();
+  // Eigen::Vector3d ref_pt(0.0, 0.0, 0.0);
+  // Eigen::MatrixXd jacobian;
+  // robot_state->getJacobian(joint_model, robot_state->getLinkModel(joint_model->getLinkModelNames().back()),
+  //                        ref_pt, jacobian);
+  // RCLCPP_INFO_STREAM(LOGGER, "Jacobian: \n" << jacobian << "\n");
 
   // Settings
+  double Ts = 0.1;
+
   move_group.setPlanningTime(30.0);
 
   move_group.setPlanningPipelineId("ompl");
@@ -104,17 +114,16 @@ int main(int argc, char * argv[])
   auto goal_sub = node->create_subscription<geometry_msgs::msg::Pose>(
     "target_pose",
     10,
-    [&move_group, robotState, &save_state, joint_model, &LOGGER](geometry_msgs::msg::Pose p)
+    [&move_group, robot_state, joint_model, &LOGGER](geometry_msgs::msg::Pose p)
     {
       RCLCPP_INFO(LOGGER, "Received target pose");
-      bool foundIK = robotState->setFromIK(joint_model, p);
+      bool foundIK = robot_state->setFromIK(joint_model, p);
       if (!foundIK)
         RCLCPP_ERROR(LOGGER, "Not joint configuration found");
       else
       {
         std::vector<double> joints_positions;
-        robotState->copyJointGroupPositions(joint_model, joints_positions);
-        save_state = *robotState;
+        robot_state->copyJointGroupPositions(joint_model, joints_positions);
 
         move_group.setJointValueTarget(joints_positions);
         RCLCPP_INFO(LOGGER, "Target pose done");
@@ -125,15 +134,15 @@ int main(int argc, char * argv[])
   auto start_sub = node->create_subscription<geometry_msgs::msg::Pose>(
     "start_pose",
     10,
-    [&move_group, robotState, joint_model, &LOGGER](geometry_msgs::msg::Pose p)
+    [&move_group, robot_state, joint_model, &LOGGER](geometry_msgs::msg::Pose p)
     {
       RCLCPP_INFO(LOGGER, "Received start pose");
-      bool foundIK = robotState->setFromIK(joint_model, p);
+      bool foundIK = robot_state->setFromIK(joint_model, p);
       if (!foundIK)
         RCLCPP_ERROR(LOGGER, "Not joint configuration found");
       else
       {
-        move_group.setStartState(*robotState);
+        move_group.setStartState(*robot_state);
         RCLCPP_INFO(LOGGER, "Start pose done");
       }
     }
@@ -150,9 +159,37 @@ int main(int argc, char * argv[])
   auto plan_sub = node->create_subscription<std_msgs::msg::Empty>(
     "start_planning",
     10,
-    [&move_group, save_state, joint_model, &plan, &LOGGER, &pathFound, &moveit_visual_tools, &marker_pub](std_msgs::msg::Empty empty){
-      pathFound = move_group.plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
-      RCLCPP_INFO(LOGGER, "Path : %s", pathFound ? "SUCCESS" : "FAILED");
+    [&move_group, robot_state, joint_model, &plan, &LOGGER, &pathFound, &Ts, &moveit_visual_tools, &marker_pub](std_msgs::msg::Empty){ 
+      pathFound = false;
+      unsigned int iter = 0;
+      do
+      {
+        ++iter;
+        
+        pathFound = move_group.plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
+        RCLCPP_INFO(LOGGER, "Path %d : %s", iter, pathFound ? "SUCCESS" : "FAILED");
+
+        Eigen::VectorXd joints_positions;
+        robot_state->copyJointGroupPositions(joint_model, joints_positions);
+        
+        Eigen::Vector3d ref_pt(0.0, 0.0, 0.0);
+        Eigen::MatrixXd jacobian;
+        robot_state->getJacobian(joint_model, robot_state->getLinkModel(joint_model->getLinkModelNames().back()), ref_pt, jacobian);
+
+        auto N = Eigen::MatrixXd::Identity(7, 7) -  jacobian.transpose() * jacobian;
+        Eigen::VectorXd q_o(7);
+        for (int i = 0; i < 7; i++)
+          q_o(i) = 1;
+
+        auto dq = N * q_o;
+        joints_positions += Ts*dq;
+
+        robot_state->setJointGroupPositions(joint_model, joints_positions);
+        move_group.setStartState(*robot_state);
+
+        moveit_visual_tools.prompt("WAIT");
+        moveit_visual_tools.prompt("BUG");
+      } while (iter < 30);
 
       RCLCPP_INFO(LOGGER, "Let's draw ?");
       
@@ -160,19 +197,17 @@ int main(int argc, char * argv[])
       robot_trajectory::RobotTrajectory rt(move_group.getRobotModel(), "panda_arm");
       // moveit::core::RobotStatePtr current_state = move_group.getCurrentState();
 
-      rt.setRobotTrajectoryMsg(save_state, plan.trajectory_);
+      rt.setRobotTrajectoryMsg(*robot_state, plan.trajectory_);
 
       publishTcpTrajectory(rt, "panda_tool", marker_pub);
       moveit_visual_tools.trigger();
-
-      move_group.execute(plan);
-      // move_group.move();
     }
   );
 
+
   rclcpp::Rate rate(100);
   while (rclcpp::ok()) {
-    robotState = move_group.getCurrentState();
+    // robot_state = move_group.getCurrentState();
     rate.sleep();
   }
 

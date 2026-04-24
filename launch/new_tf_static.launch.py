@@ -23,7 +23,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="static_transform_publisher",
         output="log",
-        arguments=["-1.0", "0.0", "0.4", "1.57", "1.57", "0.0", "tag36h11:15", "camera_link"],
+        arguments=["-1.4", "0.0", "0.4", "1.57", "1.57", "0.0", "tag36h11:15", "camera_link"],
     )
 
     depth_frame = Node(

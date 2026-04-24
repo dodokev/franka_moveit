@@ -26,9 +26,25 @@ ament_target_dependencies(
 
 install(TARGETS franka_moveit
   DESTINATION lib/${PROJECT_NAME})
-
-# ================================================================================
-
+  
+  # ================================================================================
+  
+  add_executable(testing src/testing.cpp)
+  target_include_directories(testing PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>)
+  target_compile_features(testing PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+  
+  ament_target_dependencies(
+    testing
+    "rclcpp"
+    "moveit_ros_planning_interface"
+    "moveit_visual_tools"
+  )
+  
+  install(TARGETS testing
+    DESTINATION lib/${PROJECT_NAME})
+  
 # ================================================================================
 
 if(BUILD_TESTING)
