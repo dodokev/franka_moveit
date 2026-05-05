@@ -168,28 +168,7 @@ int main(int argc, char * argv[])
         
         pathFound = move_group.plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
         RCLCPP_INFO(LOGGER, "Path %d : %s", iter, pathFound ? "SUCCESS" : "FAILED");
-
-        Eigen::VectorXd joints_positions;
-        robot_state->copyJointGroupPositions(joint_model, joints_positions);
-        
-        Eigen::Vector3d ref_pt(0.0, 0.0, 0.0);
-        Eigen::MatrixXd jacobian;
-        robot_state->getJacobian(joint_model, robot_state->getLinkModel(joint_model->getLinkModelNames().back()), ref_pt, jacobian);
-
-        auto N = Eigen::MatrixXd::Identity(7, 7) -  jacobian.transpose() * jacobian;
-        Eigen::VectorXd q_o(7);
-        for (int i = 0; i < 7; i++)
-          q_o(i) = 1;
-
-        auto dq = N * q_o;
-        joints_positions += Ts*dq;
-
-        robot_state->setJointGroupPositions(joint_model, joints_positions);
-        move_group.setStartState(*robot_state);
-
-        moveit_visual_tools.prompt("WAIT");
-        moveit_visual_tools.prompt("BUG");
-      } while (iter < 30);
+      } while (iter < 5);
 
       RCLCPP_INFO(LOGGER, "Let's draw ?");
       

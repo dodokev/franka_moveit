@@ -15,6 +15,16 @@
 #include <moveit/robot_trajectory/robot_trajectory.h>
 #include <moveit/robot_state/robot_state.h>
 
+double mean(std::vector<double>& values)
+{
+  double result = 0.0;
+
+  for (int i = 0; i < values.size(); i++)
+    result += values.at(i);
+
+  return result/values.size();
+}
+
 double cosRialzato(double sigma, double lambda, double threshold)
 {
   double tmp, reg;
@@ -77,6 +87,48 @@ Eigen::MatrixXd eig_pinv(Eigen::MatrixXd J, double threshold, double lambda)
   return pinvJ;
 }
 
+void publishTcpTrajectory(
+  const robot_trajectory::RobotTrajectory& trajectory,
+  const std::string& tcp_link,
+  const rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr& pub)
+  {
+    visualization_msgs::msg::Marker marker;
+    marker.header.frame_id = "world";  // base frame
+    marker.header.stamp = rclcpp::Clock().now();
+    marker.ns = "tcp_path";
+    marker.id = 0;
+    marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+
+    marker.scale.x = 0.005; // line thickness
+
+    marker.color.r = 1.0;
+    marker.color.g = 0.0;
+    marker.color.b = 0.0;
+    marker.color.a = 1.0;
+
+    marker.pose.orientation.w = 1.0;
+
+    // Iterate over trajectory waypoints
+    for (size_t i = 0; i < trajectory.getWayPointCount(); ++i)
+    {
+      const moveit::core::RobotState& state = trajectory.getWayPoint(i);
+
+      // From state at a waypoint, get transform of tcp_link from panda_tool0
+      const Eigen::Isometry3d& tcp_pose = state.getGlobalLinkTransform(tcp_link);
+      
+      // Create new point from the pose
+      geometry_msgs::msg::Point p;
+      p.x = tcp_pose.translation().x();
+      p.y = tcp_pose.translation().y();
+      p.z = tcp_pose.translation().z();
+
+      marker.points.push_back(p);
+    }
+
+    pub->publish(marker);
+  }
+
 int main(int argc, char *argv[])
 {
   // Initialize ROS and create the Node
@@ -106,15 +158,19 @@ int main(int argc, char *argv[])
   moveit::core::RobotStatePtr robot_state = move_group.getCurrentState();
   const moveit::core::JointModelGroup *joint_model = robot_state->getJointModelGroup(plannerGroup);
 
+  // moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
+
+  
   // Settings
-  move_group.setPlanningTime(0.25);
+  move_group.setPlanningTime(0.1);
   // move_group.setPlanningTime(1.0);
+  move_group.setNumPlanningAttempts(10);
 
   move_group.setPlanningPipelineId("ompl");
   // move_group.setPlanningPipelineId("pilz_industrial_motion_planner");
   // move_group.setPlannerId("PTP");
-  move_group.setPlannerId("RRTstarkConfigDefault");
-  // move_group.setPlannerId("RRTConnectkConfigDefault");
+  // move_group.setPlannerId("RRTstarkConfigDefault");
+  move_group.setPlannerId("RRTConnectkConfigDefault");
 
   namespace rvt = rviz_visual_tools;
   auto moveit_visual_tools = moveit_visual_tools::MoveItVisualTools{node, "world", rviz_visual_tools::RVIZ_MARKER_TOPIC, move_group.getRobotModel()};
@@ -214,41 +270,50 @@ int main(int argc, char *argv[])
 
   moveit_msgs::msg::Constraints test_constraints;
   test_constraints.orientation_constraints.push_back(ocm);
-  move_group.setPathConstraints(test_constraints);
+  // move_group.setPathConstraints(test_constraints);
   // ================================================================================
 
   moveit_msgs::msg::RobotTrajectory cartesian_traj;
-  double eef_step = 1e-4;
-  double frac = 0.0;
-  double jump = 5.0;
+  // double eef_step = 1e-3;
+  // double frac = 0.0;
+  // double jump = 3.0;
 
   std::vector<geometry_msgs::msg::Pose> pts;
   pts.push_back(start_pose);
   pts.push_back(target_pose);
 
+  double exploration = 0.5;
+  unsigned int counter = 0;
+  unsigned int maxPathFound = 10;
+  std::vector<double> compute_times;
+
   moveit_visual_tools.prompt("Begin plannnig");
+  
   do
   {
     ++iter;
 
-    frac = move_group.computeCartesianPath(pts, eef_step, jump, cartesian_traj);
+    // frac = move_group.computeCartesianPath(pts, eef_step, jump, cartesian_traj);
     // RCLCPP_INFO(LOGGER, "Cartesian path compute at : %f pourcent", frac);
-    if (frac > 0.95)
-    {
-      pathFound = true;  
-      RCLCPP_INFO(LOGGER, "Cartesian Path %d : %s", iter, pathFound ? "SUCCESS" : "FAILED");  
-      break;
-    }
-    else 
-    {
-      pathFound = false;
-      RCLCPP_INFO(LOGGER, "Cartesian Path %d : %s", iter, pathFound ? "SUCCESS" : "FAILED");
-    }
+    // if (frac > 0.95)
+    // {
+    //   pathFound = true;
+    //   RCLCPP_INFO(LOGGER, "Cartesian Path %d : %s", iter, pathFound ? "SUCCESS" : "FAILED");
+    //   compute_times.push_back(plan.planning_time_);
+    //   ++counter;
+    // }
+    // else
+    //   pathFound = false;
     
     // --------------------------------------------------------------------------------
     
     pathFound = move_group.plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
-    RCLCPP_INFO(LOGGER, "OMPL Path %d : %s", iter, pathFound ? "SUCCESS" : "FAILED");
+    if (pathFound)
+    {
+      RCLCPP_INFO(LOGGER, "OMPL Path %d : %s", iter, pathFound ? "SUCCESS" : "FAILED");
+      compute_times.push_back(plan.planning_time_);
+      ++counter;
+    }
     
     // --------------------------------------------------------------------------------
 
@@ -284,6 +349,8 @@ int main(int argc, char *argv[])
       robot_state->setJointGroupPositions(joint_model, start_joint);
       joints_positions = start_joint;
 
+      exploration += 0.5;
+
       dq_o = -dq_o;
     }
 
@@ -294,11 +361,27 @@ int main(int argc, char *argv[])
     moveit_visual_tools.trigger();
     rclcpp::sleep_for(std::chrono::milliseconds(10));
 
-  } while (!pathFound);
+  } while (counter < maxPathFound);
  
   RCLCPP_INFO(LOGGER, "Error position : %f meter(s)", err.head<3>().norm());
   RCLCPP_INFO_STREAM(LOGGER, "Error quaternion : \n" << err.tail<3>() << "\n");
   
+  RCLCPP_INFO(LOGGER, "Nb waypoints OMPL : %ld", plan.trajectory_.joint_trajectory.points.size());
+  RCLCPP_INFO(LOGGER, "Nb waypoints Cartesian : %ld", cartesian_traj.joint_trajectory.points.size());
+
+  RCLCPP_INFO(LOGGER, "Nullspace exploration : %f", exploration);
+  RCLCPP_INFO(LOGGER, "Mean planning time : %f", mean(compute_times));
+
+  // auto taj = cartesian_traj.joint_trajectory.points;
+  // RCLCPP_INFO(LOGGER, "pos1 (joint4) : %f", taj[0].positions[3]);
+  // RCLCPP_INFO(LOGGER, "pos2 (joint4) : %f", taj[1].positions[3]);
+
+  moveit_visual_tools.publishTrajectoryLine(plan.trajectory_, joint_model);
+  robot_trajectory::RobotTrajectory rt(move_group.getRobotModel(), "panda_arm");
+  rt.setRobotTrajectoryMsg(*robot_state, plan.trajectory_);
+  publishTcpTrajectory(rt, "panda_tool", marker_pub);
+  moveit_visual_tools.trigger();
+
   //  RobotTrajectory.trajectory_.joint_trajectory.points --> waypoints
   //  waypoint :
   //    time_from_start

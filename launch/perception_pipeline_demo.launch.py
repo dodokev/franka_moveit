@@ -69,6 +69,8 @@ def generate_launch_description():
         output="screen",
         parameters=[moveit_config.to_dict(), planning_scene_monitor_yaml],
         arguments=["--ros-args", "--log-level", "info"],
+        emulate_tty=True,
+        
     )
 
     # RViz
