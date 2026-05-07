@@ -14,6 +14,8 @@ find_package(pluginlib REQUIRED)
 find_package(moveit_core REQUIRED)
 find_package(moveit_ros_planning REQUIRED)
 
+# ================================================================================
+
 add_library(custom_feasibility_adapter SHARED
   src/custom_feasibility_adapter.cpp
 )
@@ -94,7 +96,25 @@ install(TARGETS franka_moveit
   install(TARGETS cloud_transform
     DESTINATION lib/${PROJECT_NAME})
   
-# ======================================
+# ============================================================================
+
+add_executable(simple_mvt src/simple_mvt.cpp)
+target_include_directories(simple_mvt PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_compile_features(simple_mvt PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+
+ament_target_dependencies(
+  simple_mvt
+  "rclcpp"
+  "moveit_ros_planning_interface"
+  "moveit_visual_tools"
+)
+
+install(TARGETS simple_mvt
+  DESTINATION lib/${PROJECT_NAME})
+  
+# ================================================================================
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

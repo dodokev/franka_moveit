@@ -31,7 +31,7 @@ public:
         const auto* link = state.getLinkModel("panda_tool");
         const Eigen::Isometry3d& tf = state.getGlobalLinkTransform(link);
 
-        
+        RCLCPP_WARN(rclcpp::get_logger("adapter"), "panda_tool height : %f", tf.translation().z());        
 
         return tf.translation().z() > 0.025;
         return true;

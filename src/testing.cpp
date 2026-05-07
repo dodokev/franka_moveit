@@ -9,14 +9,10 @@
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 #include <geometry_msgs/msg/transform_stamped.hpp>
-#include <std_msgs/msg/empty.hpp>
 
 #include <visualization_msgs/msg/marker.hpp>
 #include <moveit/robot_trajectory/robot_trajectory.h>
 #include <moveit/robot_state/robot_state.h>
-
-#include <moveit/trajectory_processing/time_optimal_trajectory_generation.h>
-#include <moveit/trajectory_processing/ruckig_traj_smoothing.h>
 
 double cosRialzato(double sigma, double lambda, double threshold)
 {
@@ -149,9 +145,6 @@ int main(int argc, char *argv[])
   moveit::planning_interface::MoveGroupInterface::Plan plan;
   moveit::core::RobotStatePtr robot_state = move_group.getCurrentState();
   const moveit::core::JointModelGroup *joint_model = robot_state->getJointModelGroup(plannerGroup);
-
-  // moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
-
   
   // Settings
   move_group.setPlanningTime(0.1);
@@ -163,6 +156,7 @@ int main(int argc, char *argv[])
   // move_group.setPlannerId("PTP");
   // move_group.setPlannerId("RRTstarkConfigDefault");
   move_group.setPlannerId("RRTConnectkConfigDefault");
+  // move_group.setPlannerId("RRTkConfigDefault");
 
   namespace rvt = rviz_visual_tools;
   auto moveit_visual_tools = moveit_visual_tools::MoveItVisualTools{node, "world", rviz_visual_tools::RVIZ_MARKER_TOPIC, move_group.getRobotModel()};
@@ -174,20 +168,10 @@ int main(int argc, char *argv[])
 
   auto current_pose = move_group.getCurrentPose().pose;
   geometry_msgs::msg::Pose start_pose;
-  start_pose.orientation.x = current_pose.orientation.x;
-  start_pose.orientation.y = current_pose.orientation.y;
-  start_pose.orientation.z = current_pose.orientation.z;
-  start_pose.orientation.w = current_pose.orientation.w;
+  start_pose = current_pose;
 
-  // double angle = 90;
-  // start_pose.orientation.x = sin(angle * M_PI_2 / 180) * 0.0;
-  // start_pose.orientation.y = sin(angle * M_PI_2 / 180) * 1.0;
-  // start_pose.orientation.z = sin(angle * M_PI_2 / 180) * 0.0;
-  // start_pose.orientation.w = cos(angle * M_PI_2 / 180);
-
-  start_pose.position.x = current_pose.position.x + 0.20;
-  start_pose.position.y = current_pose.position.y;
-  start_pose.position.z = current_pose.position.z - 0.40;
+  start_pose.position.x += 0.20;
+  start_pose.position.z -= 0.40;
 
   geometry_msgs::msg::Pose second_pose;
 
@@ -208,20 +192,9 @@ int main(int argc, char *argv[])
 
   // Set a target Pose
   geometry_msgs::msg::Pose target_pose;
-  target_pose.orientation.x = start_pose.orientation.x;
-  target_pose.orientation.y = start_pose.orientation.y;
-  target_pose.orientation.z = start_pose.orientation.z;
-  target_pose.orientation.w = start_pose.orientation.w;
+  target_pose = start_pose;
 
-  // double angle = 90;
-  // target_pose.orientation.x = sin(angle * M_PI_2 / 180) * 0.0;
-  // target_pose.orientation.y = sin(angle * M_PI_2 / 180) * 1.0;
-  // target_pose.orientation.z = sin(angle * M_PI_2 / 180) * 0.0;
-  // target_pose.orientation.w = cos(angle * M_PI_2 / 180);
-
-  target_pose.position.x = start_pose.position.x + 0.25;
-  target_pose.position.y = start_pose.position.y;
-  target_pose.position.z = start_pose.position.z;
+  target_pose.position.x += 0.20;
 
   move_group.setPoseTarget(target_pose);
 
@@ -403,7 +376,7 @@ int main(int argc, char *argv[])
   // ================================================================================
   // Draw panda_link8 path + end_effector
   
-  // moveit_visual_tools.publishTrajectoryLine(plan.trajectory_, joint_model);
+  moveit_visual_tools.publishTrajectoryLine(plan.trajectory_, joint_model);
   robot_trajectory::RobotTrajectory rt(move_group.getRobotModel(), "panda_arm");
   rt.setRobotTrajectoryMsg(*robot_state, plan.trajectory_);
   publishTcpTrajectory(rt, "panda_tool", marker_pub);
@@ -417,34 +390,7 @@ int main(int argc, char *argv[])
   // moveit_visual_tools.prompt("Ready to execute _2");
   // move_group.execute(plan);
 
-  // ================================================================================
-  // trajectory processing (acceleration - velocity)
 
-  /**
-   * Replace this "part" with s-curve of Clément (need adaptation first)
-   */
-  
-
-  // trajectory_processing::RuckigSmoothing traj_proc;
-  // traj_proc.applySmoothing(rt);
-
-  // trajectory_processing::TimeOptimalTrajectoryGeneration traj_proc;
-  // traj_proc.computeTimeStamps(rt);  
-  
-  // moveit_msgs::msg::RobotTrajectory new_traj;
-  // rt.getRobotTrajectoryMsg(new_traj);
-  // moveit_visual_tools.publishTrajectoryLine(new_traj, joint_model);
-  // moveit_visual_tools.trigger();
-
-  // RCLCPP_INFO(LOGGER, "Nb waypoints time_param plan : %ld", rt.getWayPointCount());
-  // for (std::size_t i = 0; i < rt.getWayPointCount(); i++)
-  // {
-  //   if (rt.getWayPoint(i).hasVelocities())
-  //     RCLCPP_INFO(LOGGER, "Waypt %ld - vel : %f", i, *(rt.getWayPoint(i).getJointVelocities("panda_joint4")));
-  //   if (rt.getWayPoint(i).hasAccelerations())
-  //     RCLCPP_INFO(LOGGER, "Waypt %ld - accel : %f", i, *(rt.getWayPoint(i).getJointAccelerations("panda_joint4")));
-  // }
-  
   // ================================================================================
   // NOTES
   
