@@ -15,15 +15,8 @@
 #include <moveit/robot_trajectory/robot_trajectory.h>
 #include <moveit/robot_state/robot_state.h>
 
-double mean(std::vector<double>& values)
-{
-  double result = 0.0;
-
-  for (int i = 0; i < values.size(); i++)
-    result += values.at(i);
-
-  return result/values.size();
-}
+#include <moveit/trajectory_processing/time_optimal_trajectory_generation.h>
+#include <moveit/trajectory_processing/ruckig_traj_smoothing.h>
 
 double cosRialzato(double sigma, double lambda, double threshold)
 {
@@ -137,9 +130,8 @@ int main(int argc, char *argv[])
   auto const node = std::make_shared<rclcpp::Node>(
       "franka",
       rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true));
-
   auto const LOGGER = rclcpp::get_logger("franka");
-
+  
   // Publisher for path of another link
   auto marker_pub = node->create_publisher<visualization_msgs::msg::Marker>("tcp_trajectory", 10);
 
@@ -282,10 +274,8 @@ int main(int argc, char *argv[])
   pts.push_back(start_pose);
   pts.push_back(target_pose);
 
-  double exploration = 0.5;
   unsigned int counter = 0;
-  unsigned int maxPathFound = 10;
-  std::vector<double> compute_times;
+  unsigned int maxPath = 500;
 
   moveit_visual_tools.prompt("Begin plannnig");
   
@@ -299,7 +289,6 @@ int main(int argc, char *argv[])
     // {
     //   pathFound = true;
     //   RCLCPP_INFO(LOGGER, "Cartesian Path %d : %s", iter, pathFound ? "SUCCESS" : "FAILED");
-    //   compute_times.push_back(plan.planning_time_);
     //   ++counter;
     // }
     // else
@@ -311,7 +300,6 @@ int main(int argc, char *argv[])
     if (pathFound)
     {
       RCLCPP_INFO(LOGGER, "OMPL Path %d : %s", iter, pathFound ? "SUCCESS" : "FAILED");
-      compute_times.push_back(plan.planning_time_);
       ++counter;
     }
     
@@ -324,8 +312,6 @@ int main(int argc, char *argv[])
     // double lambda = 1e-3;
     // Eigen::MatrixXd J_pinv = jacobian.transpose() * (jacobian * jacobian.transpose() + lambda * Eigen::MatrixXd::Identity(6, 6)).inverse();
     Eigen::MatrixXd J_pinv = eig_pinv(jacobian, 0.01, 0.001);
-    // RCLCPP_INFO(LOGGER, "Jpinv Rows : %d", J_pinv.rows());
-    // RCLCPP_INFO(LOGGER, "Jpinv Cols : %d", J_pinv.cols());
     auto N = Eigen::MatrixXd::Identity(7, 7) - J_pinv * jacobian;
 
     auto current_tf = robot_state->getGlobalLinkTransform("panda_tool");
@@ -349,8 +335,6 @@ int main(int argc, char *argv[])
       robot_state->setJointGroupPositions(joint_model, start_joint);
       joints_positions = start_joint;
 
-      exploration += 0.5;
-
       dq_o = -dq_o;
     }
 
@@ -361,7 +345,7 @@ int main(int argc, char *argv[])
     moveit_visual_tools.trigger();
     rclcpp::sleep_for(std::chrono::milliseconds(10));
 
-  } while (counter < maxPathFound);
+  } while (iter < maxPath && !pathFound);
  
   RCLCPP_INFO(LOGGER, "Error position : %f meter(s)", err.head<3>().norm());
   RCLCPP_INFO_STREAM(LOGGER, "Error quaternion : \n" << err.tail<3>() << "\n");
@@ -369,19 +353,101 @@ int main(int argc, char *argv[])
   RCLCPP_INFO(LOGGER, "Nb waypoints OMPL : %ld", plan.trajectory_.joint_trajectory.points.size());
   RCLCPP_INFO(LOGGER, "Nb waypoints Cartesian : %ld", cartesian_traj.joint_trajectory.points.size());
 
-  RCLCPP_INFO(LOGGER, "Nullspace exploration : %f", exploration);
-  RCLCPP_INFO(LOGGER, "Mean planning time : %f", mean(compute_times));
+  // ================================================================================
+  // auto joints = plan.trajectory_.joint_trajectory;
+  // auto points = joints.points;
 
-  // auto taj = cartesian_traj.joint_trajectory.points;
-  // RCLCPP_INFO(LOGGER, "pos1 (joint4) : %f", taj[0].positions[3]);
-  // RCLCPP_INFO(LOGGER, "pos2 (joint4) : %f", taj[1].positions[3]);
+  // for (std::size_t i = 0; i < points.size(); i++)
+  // {
+  //   RCLCPP_INFO(LOGGER, "Waypt %ld - vel : %f", i, points[i].velocities[3]);
+  //   RCLCPP_INFO(LOGGER, "Waypt %ld - accel : %f", i, points[i].accelerations[3]);
+  // }
 
-  moveit_visual_tools.publishTrajectoryLine(plan.trajectory_, joint_model);
+  // ================================================================================
+  // Compute plan from the current pose to the new start pose
+  
+  // move_group.setPlanningPipelineId("ompl");
+  // move_group.setPlannerId("RRTConnectkConfigDefault");
+
+  // moveit::planning_interface::MoveGroupInterface::Plan new_start;  
+  // std::vector<double> jp;
+  // for (int i = 0; i < 7; i++)
+  //   jp.push_back(joints_positions(i));
+    
+  // move_group.setStartStateToCurrentState();
+  // move_group.setJointValueTarget(jp);
+  
+  // moveit_visual_tools.prompt("From ready pose to new start");
+  // do
+  // {
+  //   pathFound = move_group.plan(new_start) == moveit::core::MoveItErrorCode::SUCCESS;
+  //   RCLCPP_INFO(LOGGER, "OMPL Path %s", pathFound ? "SUCCESS" : "FAILED");
+  // } while (!pathFound);
+
+  // ================================================================================
+  // Compute plan second tim from new start pose to goal
+
+  // move_group.setPlanningPipelineId("ompl");
+  // move_group.setPlannerId("RRTstarkConfigDefault");
+
+  // robot_state->setJointGroupPositions(joint_model, jp);
+  // move_group.setStartState(*robot_state);
+  // move_group.setPoseTarget(target_pose);
+
+  // do
+  // {
+  //   pathFound = move_group.plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
+  //   RCLCPP_INFO(LOGGER, "OMPL Path %s", pathFound ? "SUCCESS" : "FAILED");
+  // } while (!pathFound);
+
+  // ================================================================================
+  // Draw panda_link8 path + end_effector
+  
+  // moveit_visual_tools.publishTrajectoryLine(plan.trajectory_, joint_model);
   robot_trajectory::RobotTrajectory rt(move_group.getRobotModel(), "panda_arm");
   rt.setRobotTrajectoryMsg(*robot_state, plan.trajectory_);
   publishTcpTrajectory(rt, "panda_tool", marker_pub);
   moveit_visual_tools.trigger();
+  
+  // moveit_visual_tools.publishTrajectoryLine(new_start.trajectory_, joint_model);
+  // moveit_visual_tools.trigger();
 
+  // moveit_visual_tools.prompt("Ready to execute");
+  // move_group.execute(new_start);
+  // moveit_visual_tools.prompt("Ready to execute _2");
+  // move_group.execute(plan);
+
+  // ================================================================================
+  // trajectory processing (acceleration - velocity)
+
+  /**
+   * Replace this "part" with s-curve of Clément (need adaptation first)
+   */
+  
+
+  // trajectory_processing::RuckigSmoothing traj_proc;
+  // traj_proc.applySmoothing(rt);
+
+  // trajectory_processing::TimeOptimalTrajectoryGeneration traj_proc;
+  // traj_proc.computeTimeStamps(rt);  
+  
+  // moveit_msgs::msg::RobotTrajectory new_traj;
+  // rt.getRobotTrajectoryMsg(new_traj);
+  // moveit_visual_tools.publishTrajectoryLine(new_traj, joint_model);
+  // moveit_visual_tools.trigger();
+
+  // RCLCPP_INFO(LOGGER, "Nb waypoints time_param plan : %ld", rt.getWayPointCount());
+  // for (std::size_t i = 0; i < rt.getWayPointCount(); i++)
+  // {
+  //   if (rt.getWayPoint(i).hasVelocities())
+  //     RCLCPP_INFO(LOGGER, "Waypt %ld - vel : %f", i, *(rt.getWayPoint(i).getJointVelocities("panda_joint4")));
+  //   if (rt.getWayPoint(i).hasAccelerations())
+  //     RCLCPP_INFO(LOGGER, "Waypt %ld - accel : %f", i, *(rt.getWayPoint(i).getJointAccelerations("panda_joint4")));
+  // }
+  
+  // ================================================================================
+  // NOTES
+  
   //  RobotTrajectory.trajectory_.joint_trajectory.points --> waypoints
   //  waypoint :
   //    time_from_start
@@ -394,7 +460,7 @@ int main(int argc, char *argv[])
   /**
   * computeCartesianPath :
   *   - very fast
-  *   - straigh line
+  *   - straight line
   *   - 
   * OMPL plan :
   *   - could found solution before cartesian (nullspace search)

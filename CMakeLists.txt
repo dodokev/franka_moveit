@@ -10,6 +10,37 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 find_package(moveit_visual_tools REQUIRED)
+find_package(pluginlib REQUIRED)
+find_package(moveit_core REQUIRED)
+find_package(moveit_ros_planning REQUIRED)
+
+add_library(custom_feasibility_adapter SHARED
+  src/custom_feasibility_adapter.cpp
+)
+
+ament_target_dependencies(custom_feasibility_adapter
+  rclcpp
+  pluginlib
+  moveit_core
+  moveit_ros_planning
+)
+
+pluginlib_export_plugin_description_file(
+  moveit_core
+  custom_feasibility_adapter.xml
+)
+
+install(TARGETS custom_feasibility_adapter
+  DESTINATION lib
+)
+
+install(FILES custom_feasibility_adapter.xml
+  DESTINATION share/${PROJECT_NAME}
+)
+
+ament_export_dependencies(pluginlib moveit_core moveit_ros_planning)
+
+# ================================================================================
 
 add_executable(franka_moveit src/franka_moveit.cpp)
 target_include_directories(franka_moveit PUBLIC

@@ -1,0 +1,10 @@
+<library path="libcustom_feasibility_adapter">
+  <class
+    name="franka_moveit/CustomFeasibilityAdapter"
+    type="CustomFeasibilityAdapter"
+    base_class_type="planning_request_adapter::PlanningRequestAdapter">
+    <description>
+      Custom feasibility adapter for Franka MoveIt
+    </description>
+  </class>
+</library>
