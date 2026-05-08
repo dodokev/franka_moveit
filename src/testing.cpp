@@ -147,7 +147,7 @@ int main(int argc, char *argv[])
   const moveit::core::JointModelGroup *joint_model = robot_state->getJointModelGroup(plannerGroup);
   
   // Settings
-  move_group.setPlanningTime(0.1);
+  // move_group.setPlanningTime(0.1);
   // move_group.setPlanningTime(1.0);
   move_group.setNumPlanningAttempts(10);
 
@@ -332,8 +332,14 @@ int main(int argc, char *argv[])
 
   // for (std::size_t i = 0; i < points.size(); i++)
   // {
-  //   RCLCPP_INFO(LOGGER, "Waypt %ld - vel : %f", i, points[i].velocities[3]);
-  //   RCLCPP_INFO(LOGGER, "Waypt %ld - accel : %f", i, points[i].accelerations[3]);
+  //   RCLCPP_INFO(LOGGER, "Waypt %ld - vel 1 : %f", i, points[i].velocities[0]);
+  //   RCLCPP_INFO(LOGGER, "Waypt %ld - vel 2 : %f", i, points[i].velocities[1]);
+  //   RCLCPP_INFO(LOGGER, "Waypt %ld - vel 3 : %f", i, points[i].velocities[2]);
+  //   RCLCPP_INFO(LOGGER, "Waypt %ld - vel 4 : %f", i, points[i].velocities[3]);
+  //   RCLCPP_INFO(LOGGER, "Waypt %ld - vel 5 : %f", i, points[i].velocities[4]);
+  //   RCLCPP_INFO(LOGGER, "Waypt %ld - vel 6 : %f", i, points[i].velocities[5]);
+  //   RCLCPP_INFO(LOGGER, "Waypt %ld - vel 7 : %f", i, points[i].velocities[6]);
+  //   RCLCPP_INFO(LOGGER, "----------");
   // }
 
   // ================================================================================

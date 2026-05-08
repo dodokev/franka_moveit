@@ -26,6 +26,7 @@ def generate_launch_description():
         description="RViz configuration file",
     )
 
+    # Remove this arg (DONT FORGET IN LAUNCH DESCRIPTION)
     ros2_control_hardware_type = DeclareLaunchArgument(
         "ros2_control_hardware_type",
         default_value="mock_components",
@@ -36,6 +37,7 @@ def generate_launch_description():
         MoveItConfigsBuilder("moveit_resources_panda")
         .robot_description(
             file_path="config/panda.urdf.xacro",
+            # remove mapping when don't have mock_components
             mappings={
                 "ros2_control_hardware_type": LaunchConfiguration(
                     "ros2_control_hardware_type"
@@ -43,13 +45,23 @@ def generate_launch_description():
             },
         )
         .robot_description_semantic(file_path="config/panda.srdf")
-        .robot_description_kinematics(file_path="config/kinematics.yaml")
+        .robot_description_kinematics(
+            file_path=os.path.join(
+                get_package_share_directory("franka_moveit"),
+                "config/kinematics.yaml",
+            )
+        )
         .planning_scene_monitor(
             publish_robot_description=True, publish_robot_description_semantic=True,
         )
-        .trajectory_execution(file_path="config/gripper_moveit_controllers.yaml")
+        .trajectory_execution(
+            file_path=os.path.join(
+                get_package_share_directory("franka_moveit"),
+                "config/moveit_controllers.yaml",
+            )
+        )
         .planning_pipelines(
-            pipelines=["ompl", "chomp", "pilz_industrial_motion_planner"]
+            pipelines=["ompl"]
         )
         .sensors_3d(
             file_path=os.path.join(
@@ -60,14 +72,14 @@ def generate_launch_description():
         .to_moveit_configs()
     )
 
-    planning_scene_monitor_yaml = load_yaml("franka_moveit", "config/planning_scene_monitor.yaml") 
+    octomap_yaml = load_yaml("franka_moveit", "config/octomap.yaml")
 
     # Start the actual move_group node/action server
     move_group_node = Node(
         package="moveit_ros_move_group",
         executable="move_group",
         output="screen",
-        parameters=[moveit_config.to_dict(), planning_scene_monitor_yaml],
+        parameters=[moveit_config.to_dict(), octomap_yaml],
         arguments=["--ros-args", "--log-level", "info"],
         emulate_tty=True,
         
@@ -106,8 +118,7 @@ def generate_launch_description():
     #     executable="static_transform_publisher",
     #     name="static_transform_publisher",
     #     output="log",
-    #     # arguments=["1.0", "0.0", "0.0", "1.57", "0.0", "0.0", "tag36h11:15", "world"],
-    #     arguments=["1.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "tag36h11:15"],
+    #     arguments=["1.0", "0.0", "0.0", "1.57", "0.0", "0.0", "tag36h11:15", "world"],
     # )
 
     # Publish TF
@@ -119,6 +130,10 @@ def generate_launch_description():
         parameters=[moveit_config.robot_description],
     )
 
+    # ================================================================================
+    # When connection real robot - bringup (adapt this part)
+    # ================================================================================
+    
     # ros2_control using FakeSystem as hardware
     ros2_controllers_path = os.path.join(
         get_package_share_directory("moveit_resources_panda_moveit_config"),
@@ -156,6 +171,9 @@ def generate_launch_description():
         executable="spawner",
         arguments=["panda_hand_controller", "-c", "/controller_manager"],
     )
+
+    # ================================================================================
+    # ================================================================================
 
     return LaunchDescription(
         [

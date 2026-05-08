@@ -31,7 +31,6 @@ def generate_launch_description():
         parameters=[
             moveit_config.to_dict(),
             moveit_config.robot_description,
-            moveit_config.robot_description_kinematics,
             moveit_config.robot_description_semantic,
         ],
         emulate_tty=True,
