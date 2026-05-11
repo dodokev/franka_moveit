@@ -62,20 +62,20 @@ install(TARGETS franka_moveit
   
 # ================================================================================
   
-  add_executable(testing src/testing.cpp)
-  target_include_directories(testing PUBLIC
+  add_executable(explore_nullspace src/explore_nullspace.cpp)
+  target_include_directories(explore_nullspace PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
-  target_compile_features(testing PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+  target_compile_features(explore_nullspace PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
   
   ament_target_dependencies(
-    testing
+    explore_nullspace
     "rclcpp"
     "moveit_ros_planning_interface"
     "moveit_visual_tools"
   )
   
-  install(TARGETS testing
+  install(TARGETS explore_nullspace
     DESTINATION lib/${PROJECT_NAME})
   
 # ================================================================================

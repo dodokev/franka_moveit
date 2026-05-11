@@ -61,7 +61,7 @@ def generate_launch_description():
             )
         )
         .planning_pipelines(
-            pipelines=["ompl"]
+            pipelines=["ompl", "pilz_industrial_motion_planner"]
         )
         .sensors_3d(
             file_path=os.path.join(
