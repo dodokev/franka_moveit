@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
     auto spinner = std::thread([&executor]()
                                { executor.spin(); });
 
-    const std::string plannerGroup = "panda_arm";
+    const std::string plannerGroup = "fr3_arm";
 
     using moveit::planning_interface::MoveGroupInterface;
     auto move_group = MoveGroupInterface(node, plannerGroup);
@@ -92,8 +92,12 @@ int main(int argc, char *argv[])
     move_group.setPlanningPipelineId("ompl");
     move_group.setPlannerId("RRTConnectkConfigDefault");
 
+    RCLCPP_INFO(LOGGER, "EE name : %s", move_group.getEndEffector().c_str());
+    RCLCPP_INFO(LOGGER, "EE link : %s", move_group.getEndEffectorLink().c_str());
+    // move_group.setEndEffector()
+
     namespace rvt = rviz_visual_tools;
-    auto moveit_visual_tools = moveit_visual_tools::MoveItVisualTools{node, "world", rviz_visual_tools::RVIZ_MARKER_TOPIC, move_group.getRobotModel()};
+    auto moveit_visual_tools = moveit_visual_tools::MoveItVisualTools{node, "fr3_link0", rviz_visual_tools::RVIZ_MARKER_TOPIC, move_group.getRobotModel()};
     moveit_visual_tools.deleteAllMarkers();
     moveit_visual_tools.loadRemoteControl();
 
@@ -120,7 +124,7 @@ int main(int argc, char *argv[])
     geometry_msgs::msg::Pose target_pose;
     target_pose = start_pose;
 
-    target_pose.position.x += 0.2;
+    target_pose.position.z = 0.3;
 
     move_group.setPoseTarget(target_pose);
 
@@ -137,13 +141,14 @@ int main(int argc, char *argv[])
 
     RCLCPP_INFO(LOGGER, "Path found at iteration : %d", iter);
 
-    robot_trajectory::RobotTrajectory rt(move_group.getRobotModel(), "panda_arm");
+    // moveit_visual_tools.publishTrajectoryLine(plan.trajectory_, joint_model);
+    robot_trajectory::RobotTrajectory rt(move_group.getRobotModel(), plannerGroup);
     rt.setRobotTrajectoryMsg(*robot_state, plan.trajectory_);
-    publishTcpTrajectory(rt, "panda_tool", marker_pub);
+    publishTcpTrajectory(rt, "fr3_hand_tcp", marker_pub);
     moveit_visual_tools.trigger();
 
-    moveit_visual_tools.prompt("Press next to execute the trajectory");
-    move_group.execute(plan);
+    // moveit_visual_tools.prompt("Press next to execute the trajectory");
+    // move_group.execute(plan);
 
     rclcpp::shutdown();
     spinner.join();

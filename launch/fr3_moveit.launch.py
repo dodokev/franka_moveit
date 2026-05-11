@@ -26,7 +26,6 @@ def generate_launch_description():
         description="RViz configuration file",
     )
 
-    # Remove this arg (DONT FORGET IN LAUNCH DESCRIPTION)
     ros2_control_hardware_type = DeclareLaunchArgument(
         "ros2_control_hardware_type",
         default_value="mock_components",
@@ -34,40 +33,32 @@ def generate_launch_description():
     )
 
     moveit_config = (
-        MoveItConfigsBuilder("moveit_resources_panda")
+        MoveItConfigsBuilder("franka")
         .robot_description(
-            file_path="config/panda.urdf.xacro",
-            # remove mapping when don't have mock_components
+            file_path="config/fr3.urdf.xacro",
             mappings={
                 "ros2_control_hardware_type": LaunchConfiguration(
                     "ros2_control_hardware_type"
                 )
             },
         )
-        .robot_description_semantic(file_path="config/panda.srdf")
+        .robot_description_semantic(
+            file_path="config/fr3.srdf"
+        )
         .robot_description_kinematics(
-            file_path=os.path.join(
-                get_package_share_directory("franka_moveit"),
-                "config/kinematics.yaml",
-            )
+            file_path="config/kinematics.yaml"
         )
         .planning_scene_monitor(
             publish_robot_description=True, publish_robot_description_semantic=True,
         )
         .trajectory_execution(
-            file_path=os.path.join(
-                get_package_share_directory("franka_moveit"),
-                "config/moveit_controllers.yaml",
-            )
+            file_path="config/moveit_controllers.yaml",
         )
         .planning_pipelines(
             pipelines=["ompl", "pilz_industrial_motion_planner"]
         )
         .sensors_3d(
-            file_path=os.path.join(
-                get_package_share_directory("franka_moveit"),
-                "config/sensors_3d.yaml",
-            )
+            file_path="config/sensors_3d.yaml",
         )
         .to_moveit_configs()
     )
@@ -82,7 +73,6 @@ def generate_launch_description():
         parameters=[moveit_config.to_dict(), octomap_yaml],
         arguments=["--ros-args", "--log-level", "info"],
         emulate_tty=True,
-        
     )
 
     # RViz
@@ -104,24 +94,14 @@ def generate_launch_description():
         ],
     )
 
-    # Static TF
     static_tf_node = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
         name="static_transform_publisher",
         output="log",
-        arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "panda_link0"],
+        arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "base"],
     )
 
-    # camera_node = Node(
-    #     package="tf2_ros",
-    #     executable="static_transform_publisher",
-    #     name="static_transform_publisher",
-    #     output="log",
-    #     arguments=["1.0", "0.0", "0.0", "1.57", "0.0", "0.0", "tag36h11:15", "world"],
-    # )
-
-    # Publish TF
     robot_state_publisher = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
@@ -134,9 +114,8 @@ def generate_launch_description():
     # When connection real robot - bringup (adapt this part)
     # ================================================================================
     
-    # ros2_control using FakeSystem as hardware
     ros2_controllers_path = os.path.join(
-        get_package_share_directory("moveit_resources_panda_moveit_config"),
+        get_package_share_directory("franka_moveit_config"),
         "config",
         "ros2_controllers.yaml",
     )
@@ -160,16 +139,10 @@ def generate_launch_description():
         ],
     )
 
-    panda_arm_controller_spawner = Node(
+    fr3_arm_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["panda_arm_controller", "-c", "/controller_manager"],
-    )
-
-    panda_hand_controller_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["panda_hand_controller", "-c", "/controller_manager"],
+        arguments=["fr3_arm_controller", "-c", "/controller_manager"],
     )
 
     # ================================================================================
@@ -185,7 +158,6 @@ def generate_launch_description():
             move_group_node,
             ros2_control_node,
             joint_state_broadcaster_spawner,
-            panda_arm_controller_spawner,
-            panda_hand_controller_spawner,
+            fr3_arm_controller_spawner,
         ]
     )

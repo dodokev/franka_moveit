@@ -18,15 +18,15 @@ def load_yaml(package_name, file_path):
 
 def generate_launch_description():
     moveit_config = (
-        MoveItConfigsBuilder("moveit_resources_panda")
-        .robot_description(file_path="config/panda.urdf.xacro")
-        .robot_description_semantic(file_path="config/panda.srdf")
+        MoveItConfigsBuilder("franka")
+        .robot_description(file_path="config/fr3.urdf.xacro")
+        .robot_description_semantic(file_path="config/fr3.srdf")
         .to_moveit_configs()
     )
 
     test_node = Node(
         package="franka_moveit",
-        executable="testing",
+        executable="explore_nullspace",
         output="screen",
         parameters=[
             moveit_config.to_dict(),

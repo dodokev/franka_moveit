@@ -82,7 +82,7 @@ int main(int argc, char * argv[])
   executor.add_node(node);
   auto spinner = std::thread([&executor]() { executor.spin(); });
 
-  const std::string plannerGroup = "panda_arm";
+  const std::string plannerGroup = "fr3_arm";
 
   using moveit::planning_interface::MoveGroupInterface;
   auto move_group = MoveGroupInterface(node, plannerGroup);
@@ -159,7 +159,7 @@ int main(int argc, char * argv[])
   auto plan_sub = node->create_subscription<std_msgs::msg::Empty>(
     "start_planning",
     10,
-    [&move_group, robot_state, joint_model, &plan, &LOGGER, &pathFound, &Ts, &moveit_visual_tools, &marker_pub](std_msgs::msg::Empty){ 
+    [&move_group, robot_state, joint_model, &plan, &LOGGER, &pathFound, &Ts, &moveit_visual_tools, &marker_pub, &plannerGroup](std_msgs::msg::Empty){ 
       pathFound = false;
       unsigned int iter = 0;
       do
@@ -168,21 +168,20 @@ int main(int argc, char * argv[])
         
         pathFound = move_group.plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
         RCLCPP_INFO(LOGGER, "Path %d : %s", iter, pathFound ? "SUCCESS" : "FAILED");
-      } while (iter < 5);
+      } while (iter < 5 && !pathFound);
 
       RCLCPP_INFO(LOGGER, "Let's draw ?");
       
-      moveit_visual_tools.publishTrajectoryLine(plan.trajectory_, joint_model);
-      robot_trajectory::RobotTrajectory rt(move_group.getRobotModel(), "panda_arm");
+      // moveit_visual_tools.publishTrajectoryLine(plan.trajectory_, joint_model);
+      robot_trajectory::RobotTrajectory rt(move_group.getRobotModel(), plannerGroup);
       // moveit::core::RobotStatePtr current_state = move_group.getCurrentState();
 
       rt.setRobotTrajectoryMsg(*robot_state, plan.trajectory_);
 
-      publishTcpTrajectory(rt, "panda_tool", marker_pub);
+      publishTcpTrajectory(rt, "fr3_hand_tcp", marker_pub);
       moveit_visual_tools.trigger();
     }
   );
-
 
   rclcpp::Rate rate(100);
   while (rclcpp::ok()) {
@@ -190,11 +189,6 @@ int main(int argc, char * argv[])
     rate.sleep();
   }
 
-  // auto txt_pose = Eigen::Isometry3d::Identity();
-  // txt_pose.translation().z() = 1.0;
-
-  // auto current_pose = move_group.getCurrentPose();
-  
   // ================================================================================
   
   // moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
@@ -232,96 +226,6 @@ int main(int argc, char * argv[])
   // RCLCPP_INFO(LOGGER, "Wall constructed");
   
   // ================================================================================
-
-  // geometry_msgs::msg::Pose start_pose;
-  // start_pose.orientation.x = 0.71;
-  // start_pose.orientation.y = 0.0;
-  // start_pose.orientation.z = 0.71;
-  // start_pose.orientation.w = 0.0;
-  // start_pose.position.x = current_pose.pose.position.x + 0.2; // .507020
-  // start_pose.position.y = current_pose.pose.position.y - 0.5; // -.5
-  // start_pose.position.z = current_pose.pose.position.z - 0.1; // .379870
-
-  // RCLCPP_INFO(LOGGER, "Start pose : %f, %f, %f, %f, %f, %f, %f",
-  //   start_pose.orientation.x,
-  //   start_pose.orientation.y,
-  //   start_pose.orientation.z,
-  //   start_pose.orientation.w,
-  //   start_pose.position.x,
-  //   start_pose.position.y,
-  //   start_pose.position.z
-  // );
-
-  // bool foundIK = robotState->setFromIK(joint_model, start_pose);
-  // if (!foundIK)
-  //   RCLCPP_ERROR(LOGGER, "Not joint configuration found");
-  // else
-  //   move_group.setStartState(*robotState);
-  
-  
-  // Set a target Pose
-  // geometry_msgs::msg::Pose target_pose;
-  // target_pose.orientation.x = 0.71;
-  // target_pose.orientation.y = 0.0;
-  // target_pose.orientation.z = 0.71;
-  // target_pose.orientation.w = 0.0;
-  // target_pose.position.x = start_pose.position.x;
-  // target_pose.position.y = start_pose.position.y + 1.0;
-  // target_pose.position.z = start_pose.position.z;
-
-  // auto target_state = *robotState;
-  // foundIK = target_state.setFromIK(joint_model, target_pose);
-  // if (!foundIK)
-  //   RCLCPP_ERROR(LOGGER, "Not joint configuration found");
-  // else
-  // {
-  //   std::vector<double> joints_positions;
-  //   target_state.copyJointGroupPositions(joint_model, joints_positions);
-
-  //   move_group.setJointValueTarget(joints_positions);
-  // }
-
-  // bool pathFound = false;
-  // unsigned int numPath = 10;
-  // unsigned int numFailed = 0;
-  // unsigned int numSuccess = 0;
-
-  // for (unsigned int i = 0; i < numPath; i++)
-  // {
-  //   moveit_visual_tools.publishText(txt_pose, "Generate_Path_" + std::to_string(i), rviz_visual_tools::WHITE, rviz_visual_tools::XLARGE);
-  //   moveit_visual_tools.trigger();
-
-  //   pathFound = move_group.plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
-  //   RCLCPP_INFO(LOGGER, "Path %d : %s", i, pathFound ? "SUCCESS" : "FAILED");
-    
-  //   if (pathFound)
-  //   {
-  //     ++numSuccess;
-  //     // Normal path (panda_link8)
-  //     moveit_visual_tools.publishTrajectoryLine(plan.trajectory_, joint_model);
-
-  //     // Create robot_trajectory::RobotTrajectory to be able to visualize path from another point
-  //     robot_trajectory::RobotTrajectory rt(move_group.getRobotModel(), "panda_arm");
-  //     rt.setRobotTrajectoryMsg(*move_group.getCurrentState(), plan.trajectory_);
-  //     // publish TcpTrajectory for the panda_tool link
-  //     publishTcpTrajectory(rt, "panda_tool", marker_pub);
-
-  //     moveit_visual_tools.trigger();
-
-  //     // moveit_visual_tools.prompt("What");
-  //     break;
-  //   }
-  //   else
-  //     ++numFailed;
-  // }
-
-  // RCLCPP_INFO(LOGGER, "Number Success Path %d", numSuccess);
-  // RCLCPP_INFO(LOGGER, "Number Failed Path %d", numFailed);
-
-  // moveit_visual_tools.prompt("Press Next to End");
-  // planning_scene_interface.removeCollisionObjects(objects_id);
-
-  // Shutdown ROS
 
   rclcpp::shutdown();
   spinner.join();
