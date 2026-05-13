@@ -1,5 +1,6 @@
 #include <memory>
 #include <thread>
+#include <chrono>
 
 #include <rclcpp/rclcpp.hpp>
 #include <moveit/move_group_interface/move_group_interface.h>
@@ -14,6 +15,12 @@
 #include <visualization_msgs/msg/marker.hpp>
 #include <moveit/robot_trajectory/robot_trajectory.h>
 #include <moveit/robot_state/robot_state.h>
+
+#include <moveit/trajectory_processing/time_optimal_trajectory_generation.h>
+#include <moveit/trajectory_processing/ruckig_traj_smoothing.h>
+
+#include "franka_moveit_msg/srv/set_trajectory.hpp"
+#include "rclcpp/executors.hpp"
 
 void publishTcpTrajectory(
     const robot_trajectory::RobotTrajectory &trajectory,
@@ -57,6 +64,49 @@ void publishTcpTrajectory(
     pub->publish(marker);
 }
 
+#include <fstream>
+
+void saveDataTrajectory(const robot_trajectory::RobotTrajectory &traj)
+{
+    const std::vector<std::string> &joint_names =
+        traj.getGroup()->getVariableNames();
+
+    std::ofstream file("trajectory.csv");
+
+    file << "time";
+    for (const auto &name : joint_names)
+    {
+        file << "," << name << "_pos";
+        file << "," << name << "_vel";
+        file << "," << name << "_acc";
+    }
+    file << "\n";
+
+    for (size_t i = 0; i < traj.getWayPointCount(); ++i)
+    {
+        const auto &state = traj.getWayPoint(i);
+        double t = traj.getWayPointDurationFromStart(i);
+
+        std::vector<double> pos, vel, acc;
+        state.copyJointGroupPositions(traj.getGroup(), pos);
+        state.copyJointGroupVelocities(traj.getGroup(), vel);
+        state.copyJointGroupAccelerations(traj.getGroup(), acc);
+
+        file << t;
+
+        for (size_t j = 0; j < pos.size(); ++j)
+        {
+            file << "," << pos[j]
+                 << "," << vel[j]
+                 << "," << acc[j];
+        }
+
+        file << "\n";
+    }
+
+    file.close();
+}
+
 int main(int argc, char *argv[])
 {
     // Initialize ROS and create the Node
@@ -92,9 +142,9 @@ int main(int argc, char *argv[])
     move_group.setPlanningPipelineId("ompl");
     move_group.setPlannerId("RRTConnectkConfigDefault");
 
+    move_group.setEndEffector("tool");
     RCLCPP_INFO(LOGGER, "EE name : %s", move_group.getEndEffector().c_str());
     RCLCPP_INFO(LOGGER, "EE link : %s", move_group.getEndEffectorLink().c_str());
-    // move_group.setEndEffector()
 
     namespace rvt = rviz_visual_tools;
     auto moveit_visual_tools = moveit_visual_tools::MoveItVisualTools{node, "fr3_link0", rviz_visual_tools::RVIZ_MARKER_TOPIC, move_group.getRobotModel()};
@@ -146,6 +196,45 @@ int main(int argc, char *argv[])
     rt.setRobotTrajectoryMsg(*robot_state, plan.trajectory_);
     publishTcpTrajectory(rt, "fr3_hand_tcp", marker_pub);
     moveit_visual_tools.trigger();
+
+    // TOTG
+    trajectory_processing::TimeOptimalTrajectoryGeneration totg(1.0, 0.001, 0.001);
+    totg.computeTimeStamps(rt);
+
+    moveit_msgs::msg::RobotTrajectory traj;
+    rt.getRobotTrajectoryMsg(traj);
+    // moveit_visual_tools.publishTrajectoryLine(rt, joint_model);
+    // moveit_visual_tools.trigger();
+
+    saveDataTrajectory(rt);
+
+    rclcpp::Client<franka_moveit_msg::srv::SetTrajectory>::SharedPtr client =
+        node->create_client<franka_moveit_msg::srv::SetTrajectory>("robot_traj");
+
+    auto request = std::make_shared<franka_moveit_msg::srv::SetTrajectory::Request>();
+    request->trajectory = traj;
+
+    using namespace std::chrono_literals;
+    while (!client->wait_for_service(1s)) {
+        if (!rclcpp::ok()) {
+        RCLCPP_ERROR(LOGGER, "Interrupted while waiting for the service. Exiting.");
+        return 0;
+        }
+        RCLCPP_INFO(LOGGER, "service not available, waiting again...");
+    }
+
+    auto result = client->async_send_request(request);
+    // Wait for the result.
+    while (rclcpp::ok())
+    {
+        auto status = result.wait_for(std::chrono::milliseconds(100));
+        if (status == std::future_status::ready)
+        {
+            auto response = result.get();
+            RCLCPP_INFO(LOGGER, "RESULT: %s", response->success ? "SUCCES" : "FAILED");
+            break;
+        }
+    }
 
     // moveit_visual_tools.prompt("Press next to execute the trajectory");
     // move_group.execute(plan);
