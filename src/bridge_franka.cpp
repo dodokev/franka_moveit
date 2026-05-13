@@ -4,6 +4,8 @@
 
 static auto const LOGGER = rclcpp::get_logger("bridge_franka");
 
+using namespace std::chrono_literals;
+
 BridgeFranka::BridgeFranka()
 : Node("bridge_franka", rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true))
 {
@@ -18,6 +20,7 @@ BridgeFranka::BridgeFranka()
     qos.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
     qos.durability(RMW_QOS_POLICY_DURABILITY_VOLATILE);
     
+    timer_ = this->create_wall_timer(1ms, std::bind(&BridgeFranka::callback, this));
     pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("place_holder", qos);
 }
 
@@ -30,6 +33,15 @@ void BridgeFranka::handle_service(
     response->success = true;
 
     frankaLoop();
+}
+
+void BridgeFranka::callback()
+{
+    if (!pose_traj.empty())
+    {
+        pub_->publish(pose_traj.front());
+        pose_traj.erase(pose_traj.begin());
+    }
 }
 
 bool BridgeFranka::frankaLoop()
@@ -64,7 +76,8 @@ bool BridgeFranka::frankaLoop()
         rclcpp::Duration dt = rclcpp::Duration::from_seconds(time_from_start);
         tmp.header.stamp = start_time + dt;
 
-        pub_->publish(tmp);
+        // pub_->publish(tmp);
+        pose_traj.push_back(tmp);
     }
 
     RCLCPP_INFO(LOGGER, "Finish ... %ld waypoints", rt.getWayPointCount());

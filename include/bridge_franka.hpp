@@ -23,6 +23,11 @@ private:
 
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pub_;
     rclcpp::Service<franka_moveit_msg::srv::SetTrajectory>::SharedPtr service_;
+    rclcpp::TimerBase::SharedPtr timer_;
+
+    std::vector<geometry_msgs::msg::PoseStamped> pose_traj;
+
+    void callback();
 public:
     BridgeFranka(/* args */);
     ~BridgeFranka() = default;
