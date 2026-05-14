@@ -25,6 +25,5 @@
 
   <export>
     <build_type>ament_cmake</build_type>
-    <pluginlib plugin="${prefix}/custom_feasibility_adapter.xml"/>
   </export>
 </package>

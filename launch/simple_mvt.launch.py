@@ -32,6 +32,7 @@ def generate_launch_description():
             moveit_config.to_dict(),
             moveit_config.robot_description,
             moveit_config.robot_description_semantic,
+            {"use_sim_time": True},
         ],
         emulate_tty=True,
     )

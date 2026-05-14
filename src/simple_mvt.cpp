@@ -157,24 +157,26 @@ int main(int argc, char *argv[])
     auto current_pose = move_group.getCurrentPose().pose;
     geometry_msgs::msg::Pose start_pose;
     start_pose = current_pose;
-
-    bool foundIK = robot_state->setFromIK(joint_model, start_pose);
-    if (!foundIK)
-        RCLCPP_ERROR(LOGGER, "Not joint configuration found");
-    else
-    {
-        move_group.setStartState(*robot_state);
-        RCLCPP_INFO(LOGGER, "Start pose done");
-    }
-
-    moveit_visual_tools.publishRobotState(*robot_state);
-    moveit_visual_tools.trigger();
+    
+    // bool foundIK = robot_state->setFromIK(joint_model, start_pose);
+    // if (!foundIK)
+    // RCLCPP_ERROR(LOGGER, "Not joint configuration found");
+    // else
+    // {
+    //     move_group.setStartState(*robot_state);
+    //     RCLCPP_INFO(LOGGER, "Start pose done");
+    // }
+    
+    // moveit_visual_tools.publishRobotState(*robot_state);
+    // moveit_visual_tools.trigger();
+    
+    move_group.setStartStateToCurrentState();
 
     // Set a target Pose
     geometry_msgs::msg::Pose target_pose;
     target_pose = start_pose;
 
-    target_pose.position.z = 0.3;
+    target_pose.position.x += 0.05;
 
     move_group.setPoseTarget(target_pose);
 
@@ -198,7 +200,7 @@ int main(int argc, char *argv[])
     moveit_visual_tools.trigger();
 
     // TOTG
-    trajectory_processing::TimeOptimalTrajectoryGeneration totg(1.0, 0.001, 0.001);
+    trajectory_processing::TimeOptimalTrajectoryGeneration totg(1.0, 0.01, 0.001);
     totg.computeTimeStamps(rt);
 
     moveit_msgs::msg::RobotTrajectory traj;
@@ -206,7 +208,7 @@ int main(int argc, char *argv[])
     // moveit_visual_tools.publishTrajectoryLine(rt, joint_model);
     // moveit_visual_tools.trigger();
 
-    saveDataTrajectory(rt);
+    // saveDataTrajectory(rt);
 
     rclcpp::Client<franka_moveit_msg::srv::SetTrajectory>::SharedPtr client =
         node->create_client<franka_moveit_msg::srv::SetTrajectory>("robot_traj");

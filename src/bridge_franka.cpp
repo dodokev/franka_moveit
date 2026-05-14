@@ -21,7 +21,7 @@ BridgeFranka::BridgeFranka()
     qos.durability(RMW_QOS_POLICY_DURABILITY_VOLATILE);
     
     timer_ = this->create_wall_timer(1ms, std::bind(&BridgeFranka::callback, this));
-    pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("place_holder", qos);
+    pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("goal_pose", qos);
 }
 
 void BridgeFranka::handle_service(
@@ -58,7 +58,7 @@ bool BridgeFranka::frankaLoop()
         auto st = rt.getWayPoint(i);
         double time_from_start = rt.getWayPointDurationFromStart(i);
 
-        auto tf = st.getGlobalLinkTransform("fr3_hand_tcp");
+        auto tf = st.getGlobalLinkTransform("fr3_link8");
 
         tmp.pose.position.x = tf.translation().x();
         tmp.pose.position.y = tf.translation().y();

@@ -11,6 +11,8 @@ find_package(rclcpp REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 find_package(moveit_visual_tools REQUIRED)
 find_package(franka_moveit_msg REQUIRED)
+find_package(pcl_ros REQUIRED)
+find_package(pcl_conversions REQUIRED)
 
 add_executable(franka_moveit src/franka_moveit.cpp)
 target_include_directories(franka_moveit PUBLIC
@@ -100,6 +102,26 @@ ament_target_dependencies(
 )
 
 install(TARGETS bridge_franka
+  DESTINATION lib/${PROJECT_NAME})
+
+# ================================================================================
+# ===============================================================================
+
+add_executable(outlier_filter src/outlier_filter.cpp)
+target_include_directories(outlier_filter PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_compile_features(outlier_filter PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+
+ament_target_dependencies(
+  outlier_filter
+  "rclcpp"
+  "moveit_ros_planning_interface"
+  "moveit_visual_tools"
+  pcl_ros
+)
+
+install(TARGETS outlier_filter
   DESTINATION lib/${PROJECT_NAME})
 
 # ================================================================================

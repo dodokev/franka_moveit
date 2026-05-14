@@ -21,7 +21,7 @@ CloudToWorld::CloudToWorld()
 
 void CloudToWorld::callback(const sensor_msgs::msg::PointCloud2 msg)
 {
-    RCLCPP_INFO(LOGGER, "Cloud get");
+    RCLCPP_DEBUG(LOGGER, "Cloud get");
     try
     {
         geometry_msgs::msg::TransformStamped transform =
@@ -36,7 +36,7 @@ void CloudToWorld::callback(const sensor_msgs::msg::PointCloud2 msg)
 
         cloud_out.header.frame_id = target_frame_;
         pub_->publish(cloud_out);
-        RCLCPP_INFO(LOGGER, "Publish");
+        RCLCPP_DEBUG(LOGGER, "Publish");
     }
     catch (tf2::TransformException &ex)
     {
