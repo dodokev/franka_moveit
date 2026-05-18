@@ -26,21 +26,10 @@ def generate_launch_description():
         description="RViz configuration file",
     )
 
-    # ros2_control_hardware_type = DeclareLaunchArgument(
-    #     "ros2_control_hardware_type",
-    #     default_value="mock_components",
-    #     description="ROS 2 control hardware interface type to use for the launch file -- possible values: [mock_components, isaac]",
-    # )
-
     moveit_config = (
         MoveItConfigsBuilder("franka")
         .robot_description(
             file_path="config/fr3.urdf.xacro",
-            # mappings={
-            #     "ros2_control_hardware_type": LaunchConfiguration(
-            #         "ros2_control_hardware_type"
-            #     )
-            # },
         )
         .robot_description_semantic(
             file_path="config/fr3.srdf"
@@ -111,44 +100,6 @@ def generate_launch_description():
         output="both",
         parameters=[moveit_config.robot_description],
     )
-
-    # ================================================================================
-    # When connection real robot - bringup (adapt this part)
-    # ================================================================================
-    
-    # ros2_controllers_path = os.path.join(
-    #     get_package_share_directory("franka_moveit_config"),
-    #     "config",
-    #     "ros2_controllers.yaml",
-    # )
-    # ros2_control_node = Node(
-    #     package="controller_manager",
-    #     executable="ros2_control_node",
-    #     parameters=[ros2_controllers_path],
-    #     remappings=[
-    #         ("/controller_manager/robot_description", "/robot_description"),
-    #     ],
-    #     output="screen",
-    # )
-
-    # joint_state_broadcaster_spawner = Node(
-    #     package="controller_manager",
-    #     executable="spawner",
-    #     arguments=[
-    #         "joint_state_broadcaster",
-    #         "--controller-manager",
-    #         "/controller_manager",
-    #     ],
-    # )
-
-    # fr3_arm_controller_spawner = Node(
-    #     package="controller_manager",
-    #     executable="spawner",
-    #     arguments=["fr3_arm_controller", "-c", "/controller_manager"],
-    # )
-
-    # ================================================================================
-    # ================================================================================
 
     return LaunchDescription(
         [

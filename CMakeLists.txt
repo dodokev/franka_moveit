@@ -126,6 +126,24 @@ install(TARGETS outlier_filter
 
 # ================================================================================
 
+add_executable(octomap_cleaner src/octomap_cleaner.cpp)
+target_include_directories(octomap_cleaner PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_compile_features(octomap_cleaner PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+
+ament_target_dependencies(
+  octomap_cleaner
+  "rclcpp"
+  "moveit_ros_planning_interface"
+  pcl_ros
+)
+
+install(TARGETS octomap_cleaner
+  DESTINATION lib/${PROJECT_NAME})
+
+# ================================================================================
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

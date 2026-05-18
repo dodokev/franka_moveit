@@ -1,4 +1,4 @@
-#include "cloud_transform.hpp"
+#include "franka_moveit/cloud_transform.hpp"
 
 static auto const LOGGER = rclcpp::get_logger("cloud_to_world");
 

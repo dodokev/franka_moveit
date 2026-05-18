@@ -1,4 +1,4 @@
-#include "bridge_franka.hpp"
+#include "franka_moveit/bridge_franka.hpp"
 
 #include <moveit/robot_trajectory/robot_trajectory.h>
 
